@@ -395,6 +395,110 @@ function PersonalQuiz() {
   );
 }
 
+function AIChat() {
+  const [messages, setMessages] = useState([
+    { role: "assistant", text: "Здраво! Можеш да ме прашаш за стрес, спиење, физичка активност, булинг, или било што поврзано со добросостојбата на млади." }
+  ]);
+  const [input, setInput]     = useState("");
+  const [loading, setLoading] = useState(false);
+  const bottomRef             = useRef(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
+
+  async function sendMessage() {
+    const text = input.trim();
+    if (!text || loading) return;
+    setInput("");
+    const newMessages = [...messages, { role: "user", text }];
+    setMessages(newMessages);
+    setLoading(true);
+
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          system: "Ти си AI асистент вграден во HBSC Dashboard за Македонија. Одговарај секогаш на македонски јазик. Специјализиран си за: стрес кај адолесценти, спиење, физичка активност, булинг, употреба на екран, ментално здравје на млади 11-15 години. Кога е релевантно споменувај HBSC податоци за Македонија. Одговорите нека бидат пријателски и разбирливи. Не давај медицински дијагнози.",
+          messages: newMessages.map(m => ({ role: m.role, content: m.text })),
+        }),
+      });
+      const data = await res.json();
+      const reply = data.content?.[0]?.text || "Се извинувам, обиди се повторно.";
+      setMessages(prev => [...prev, { role: "assistant", text: reply }]);
+    } catch {
+      setMessages(prev => [...prev, { role: "assistant", text: "Се појави грешка. Обиди се повторно." }]);
+    }
+    setLoading(false);
+  }
+
+  const SUGGESTIONS = [
+    "Зошто се чувствувам под стрес пред испити?",
+    "Колку часа треба да спијам?",
+    "Што е сајбер-булинг?",
+    "Зошто е важна физичката активност?",
+  ];
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", height:520 }}>
+      <InsightBox color={C.purple}>
+        <strong>AI Асистент</strong> — прашај го сè за здравјето и добросостојбата на млади.
+      </InsightBox>
+      {messages.length === 1 && (
+        <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginBottom:"1rem" }}>
+          {SUGGESTIONS.map(s => (
+            <button key={s} onClick={() => setInput(s)} style={{
+              fontSize:12, padding:"6px 12px", borderRadius:20, cursor:"pointer",
+              border:`1px solid ${C.blue}44`, background:"#f0f7ff", color:"#0C447C",
+            }}>{s}</button>
+          ))}
+        </div>
+      )}
+      <div style={{ flex:1, overflowY:"auto", border:"0.5px solid #e0e0e0", borderRadius:12, padding:"1rem", marginBottom:"0.75rem", background:"#fafafa" }}>
+        {messages.map((m, i) => (
+          <div key={i} style={{ display:"flex", justifyContent: m.role==="user" ? "flex-end" : "flex-start", marginBottom:"0.75rem" }}>
+            <div style={{
+              maxWidth:"80%", padding:"10px 14px",
+              borderRadius: m.role==="user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+              background: m.role==="user" ? C.blue : "#fff",
+              color: m.role==="user" ? "#fff" : "#1a1a1a",
+              fontSize:14, lineHeight:1.5,
+              border: m.role==="assistant" ? "0.5px solid #e0e0e0" : "none",
+            }}>
+              {m.text}
+            </div>
+          </div>
+        ))}
+        {loading && (
+          <div style={{ display:"flex", justifyContent:"flex-start", marginBottom:"0.75rem" }}>
+            <div style={{ padding:"10px 16px", borderRadius:"18px 18px 18px 4px", background:"#fff", border:"0.5px solid #e0e0e0", color:"#888", fontSize:14 }}>
+              ⏳ Размислувам...
+            </div>
+          </div>
+        )}
+        <div ref={bottomRef} />
+      </div>
+      <div style={{ display:"flex", gap:8 }}>
+        <input
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && sendMessage()}
+          placeholder="Напиши прашање..."
+          style={{ flex:1, padding:"10px 14px", borderRadius:10, border:"0.5px solid #ccc", fontSize:14, outline:"none" }}
+        />
+        <button onClick={sendMessage} disabled={!input.trim() || loading} style={{
+          padding:"10px 20px", borderRadius:10, border:"none", fontSize:14, fontWeight:600,
+          cursor: input.trim() && !loading ? "pointer" : "not-allowed",
+          background: input.trim() && !loading ? C.blue : "#ccc", color:"#fff",
+        }}>Прати →</button>
+      </div>
+    </div>
+  );
+}
+
 const TABS = [
   { key:"overview",   label:"Преглед" },
   { key:"stress",     label:"Стрес" },
@@ -403,6 +507,7 @@ const TABS = [
   { key:"screen",     label:"Екран" },
   { key:"countries",  label:"Споредба" },
   { key:"quiz",       label:"Мојот профил" },
+  { key:"chat",       label:"AI Асистент" },
 ];
 
 const COUNTRY_METRICS = [
@@ -615,7 +720,13 @@ export default function HBSCDashboard() {
         </div>
       )}
 
-      {/* Footer */}
+      {tab === "chat" && (
+        <div>
+          <SectionTitle>AI Асистент за здравје и навики</SectionTitle>
+          <AIChat />
+        </div>
+      )}
+
       <div style={{ fontSize:12, color:"#aaa", paddingBottom:"1rem", marginTop:"2rem", borderTop:"0.5px solid #e0e0e0", paddingTop:"1rem" }}>
         <span style={{ background:"#E6F1FB", color:"#0C447C", fontSize:11, padding:"3px 10px", borderRadius:6, marginRight:6 }}>HBSC 2022</span>
         <span style={{ background:"#E1F5EE", color:"#085041", fontSize:11, padding:"3px 10px", borderRadius:6, marginRight:6 }}>WHO</span>
